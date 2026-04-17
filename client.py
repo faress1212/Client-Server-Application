@@ -3,7 +3,7 @@ import socket
 from threading import Thread
 
 client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-client_socket.connect(("mainline.proxy.rlwy.net", 50050))
+client_socket.connect(("mainline.proxy.rlwy.net:45447", 50050))
 
 home=CTk(fg_color="#7d2252")
 home.geometry('300x400')
