@@ -18,7 +18,7 @@ def receive():
 
 # الاتصال بالسيرفر
 s = socket.socket()
-s.connect(('monorail.proxy.rlwy.net', 59181))
+s.connect(('roundhouse.proxy.rlwy.net', 30156))
 
 # الشاشه
 root = Tk()
