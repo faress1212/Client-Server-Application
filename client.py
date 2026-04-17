@@ -2,7 +2,6 @@ import socket
 import threading
 from tkinter import *
 
-# دالة البعت
 def send():
     msg = entry.get()
     if msg:
@@ -10,17 +9,19 @@ def send():
         chat.insert(END, "me: " + msg + "\n")
         entry.delete(0, END)
 
-# دالة الاستقبال
 def receive():
     while True:
-        msg = s.recv(1024).decode()
-        chat.insert(END, "server: " + msg + "\n")
+        try:
+            msg = s.recv(1024).decode()
+            if msg:
+                chat.insert(END, "other: " + msg + "\n")
+        except:
+            chat.insert(END, "انقطع الاتصال\n")
+            break
 
-# الاتصال بالسيرفر
 s = socket.socket()
-s.connect(('roundhouse.proxy.rlwy.net', 30156))
+s.connect(('nozomi.proxy.rlwy.net', 36730))  # ← العنوان من Railway
 
-# الشاشه
 root = Tk()
 root.title("client")
 
@@ -35,5 +36,5 @@ entry.pack(side=LEFT)
 
 Button(frame, text="send", command=send).pack(side=LEFT)
 
-threading.Thread(target=receive, daemon=True).start()
+threading.Thread(target=receive, name="receive", daemon=True).start()
 root.mainloop()
