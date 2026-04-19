@@ -6,7 +6,7 @@ def send():
     msg = entry.get()
     if msg:
         s.send(msg.encode())
-        chat.insert(END, "me: " + msg + "\n")
+        frame.insert(END, "Fares: " + msg + "\n")
         entry.delete(0, END)
 
 def receive():
@@ -14,34 +14,30 @@ def receive():
         try:
             msg = s.recv(1024).decode()
             if msg:
-                chat.insert(END, "other: " + msg + "\n")
+                frame.insert(END, "Eslam: " + msg + "\n")
         except:
-            chat.insert(END, "انقطع الاتصال\n")
+            frame.insert(END, "Disconnected\n")
             break
 
 s = socket.socket()
 s.connect(('nozomi.proxy.rlwy.net', 36730))
 
-root = Tk()
-root.title("Chat")
-root.configure(bg="#1e1e2e")
+myScreen = Tk()
+myScreen.title("Client Server")
+myScreen.geometry("400x500")  
+myScreen.configure(bg="#1e1e2e")  
 
-chat = Text(root, bg="#2a2a3d", fg="#cdd6f4", insertbackground="white",
-            font=("Segoe UI", 11), bd=0, padx=10, pady=10)
-chat.pack(fill=BOTH, expand=True, padx=10, pady=10)
+frame = Text(myScreen, bg="#2a2a3d", fg="white")
+frame.pack(fill=BOTH, expand=True, padx=10, pady=10)
 
-frame = Frame(root, bg="#1e1e2e")
-frame.pack(fill=X, padx=10, pady=(0, 10))
+entry = Entry(myScreen, bg="#2a2a3d", fg="white",font=16)
+entry.pack(fill=X, padx=10, pady=10)
 
-entry = Entry(frame, bg="#2a2a3d", fg="#cdd6f4", insertbackground="white",
-              font=("Segoe UI", 11), bd=0, relief=FLAT)
-entry.pack(side=LEFT, fill=X, expand=True, ipady=8, padx=(0, 8))
+btn = Button(myScreen, text="Send", bg="#7d2252", fg="white",command=send)
+btn.pack(padx=10, pady=(0, 10), fill=X)
+
 entry.bind("<Return>", lambda e: send())
 
-Button(frame, text="Send", bg="#7d2252", fg="white",
-       activebackground="#a33370", activeforeground="white",
-       font=("Segoe UI", 11), bd=0, relief=FLAT,
-       padx=16, pady=8, cursor="hand2", command=send).pack(side=LEFT)
+threading.Thread(target=receive, daemon=True).start()
 
-threading.Thread(target=receive, name="receive", daemon=True).start()
-root.mainloop()
+myScreen.mainloop()
