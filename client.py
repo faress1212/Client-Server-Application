@@ -1,56 +1,26 @@
-"""
 import socket
 import threading
-from tkinter import *
-
-def send():
-    msg = entry.get()
-    if msg:
-        s.send(msg.encode())
-        frame.insert(END, "Fares: " + msg + "\n")
-        entry.delete(0, END)
-
-def receive():
-    while True:
-        try:
-            msg = s.recv(1024).decode()
-            if msg:
-                frame.insert(END, "Eslam: " + msg + "\n")
-        except:
-            frame.insert(END, "Disconnected\n")
-            break
-
-s = socket.socket()
-s.connect(('nozomi.proxy.rlwy.net', 36730))
-
-myScreen = Tk()
-myScreen.title("Client Server")
-myScreen.geometry("400x500")  
-myScreen.configure(bg="#1e1e2e")  
-
-frame = Text(myScreen, bg="#2a2a3d", fg="white")
-frame.pack(fill=BOTH, expand=True, padx=10, pady=10)
-
-entry = Entry(myScreen, bg="#2a2a3d", fg="white",font=16)
-entry.pack(fill=X, padx=10, pady=10)
-
-btn = Button(myScreen, text="Send", bg="#eb1386", fg="white",command=send)
-btn.pack(padx=10, pady=(0, 10), fill=X)
-
-entry.bind("<Return>", lambda e: send())
-
-threading.Thread(target=receive, daemon=True).start()
-
-myScreen.mainloop()
-"""
-import socket, threading, os, io
+import struct
 from tkinter import *
 from tkinter import filedialog
 from tkinter.ttk import Progressbar
+import io
 from PIL import Image
+import os
 
-END_MARKER = b"<END>"
-HD = False
+
+def send_packet(sock, data):
+    sock.sendall(struct.pack("!I", len(data)) + data)
+
+
+def recvall(sock, n):
+    data = b""
+    while len(data) < n:
+        packet = sock.recv(n - len(data))
+        if not packet:
+            return None
+        data += packet
+    return data
 
 
 def add(msg):
@@ -61,44 +31,26 @@ def add(msg):
 def send():
     msg = entry.get()
     if msg:
-        s.send(msg.encode())
-        add("eslam: " + msg)
+        send_packet(s, f"TEXT|eslam|{msg}".encode())
+        add("me: " + msg)
         entry.delete(0, END)
 
 
-def toggle():
-    global HD
-    HD = not HD
-    hd.config(text="HD ON" if HD else "HD OFF")
-
-
 def send_img():
-    path = filedialog.askopenfilename(
-        filetypes=[("Images", "*.jpg *.png *.jpeg")]
-    )
+    path = filedialog.askopenfilename(filetypes=[("Images", "*.jpg *.png *.jpeg")])
     if not path:
         return
 
     img = Image.open(path)
-    data = io.BytesIO()
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=80)
 
-    img.save(data, format="JPEG", quality=100 if HD else 25)
+    data = buf.getvalue()
 
-    s.send(f"IMAGE|{os.path.basename(path)}|".encode())
+    payload = f"IMG|eslam|{os.path.basename(path)}|".encode() + data
+    send_packet(s, payload)
 
-    d = data.getvalue()
-
-    total = len(d)
-
-    for i in range(0, total, 1024):
-        s.send(d[i:i+1024])
-        bar['value'] = (i / total) * 100
-        root.update()
-
-    s.send(END_MARKER)
-
-    bar['value'] = 0
-    add("Image Sent")
+    add("Image sent")
 
 
 def send_file():
@@ -109,77 +61,65 @@ def send_file():
     ext = os.path.splitext(path)[1]
     t = "VIDEO" if ext in [".mp4", ".avi", ".mov"] else "FILE"
 
-    s.send(f"{t}|{os.path.basename(path)}|".encode())
-
     with open(path, "rb") as f:
-        while True:
-            x = f.read(1024)
-            if not x:
-                break
-            s.send(x)
+        file_data = f.read()
 
-    s.send(END_MARKER)
-    add(f"{t} Sent")
+    payload = f"{t}|eslam|{os.path.basename(path)}|".encode() + file_data
+    send_packet(s, payload)
+
+    add(t + " sent")
 
 
 def receive():
     while True:
         try:
-            data = s.recv(1024)
+            raw_len = recvall(s, 4)
+            if not raw_len:
+                continue
+
+            length = struct.unpack("!I", raw_len)[0]
+            data = recvall(s, length)
 
             if not data:
                 continue
 
-            if data.startswith(b"IMAGE|") or data.startswith(b"FILE|") or data.startswith(b"VIDEO|"):
+            # TEXT
+            if data.startswith(b"TEXT|"):
+                _, user, msg = data.decode().split("|", 2)
+                add(f"{user}: {msg}")
 
-                info = data.decode().split("|")
-                name = "received_" + info[1]
+            # IMAGE / FILE
+            elif data.startswith(b"IMG|") or data.startswith(b"FILE|") or data.startswith(b"VIDEO|"):
+                header, user, name, filedata = data.split(b"|", 3)
 
-                file = b""
+                filename = "recv_" + name.decode()
+                with open(filename, "wb") as f:
+                    f.write(filedata)
 
-                while True:
-                    x = s.recv(1024)
-                    if END_MARKER in x:
-                        file += x.replace(END_MARKER, b"")
-                        break
-                    file += x
-
-                open(name, "wb").write(file)
-                add(info[0] + " Received")
-
-            else:
-                add("fares: " + data.decode())
+                add(f"{header.decode()} received from {user.decode()}")
 
         except:
             break
 
 
-# الاتصال بالسيرفر
+# الاتصال
 s = socket.socket()
-s.connect(('nozomi.proxy.rlwy.net', 36730))
+s.connect(("nozomi.proxy.rlwy.net", 36730))
+
 
 # UI
 root = Tk()
 root.geometry("400x600")
-root.configure(bg="#1e1e2e")
 
-chat = Text(root, bg="#2a2a3d", fg="white")
-chat.pack(fill=BOTH, expand=True, padx=10, pady=10)
+chat = Text(root)
+chat.pack(fill=BOTH, expand=True)
 
-entry = Entry(root, bg="#2a2a3d", fg="white")
-entry.pack(fill=X, padx=10, pady=5)
+entry = Entry(root)
+entry.pack(fill=X)
 
-Button(root, text="Send", command=send, bg="#7d2252", fg="white").pack(fill=X, padx=10, pady=3)
-Button(root, text="Image", command=send_img, bg="#22577a", fg="white").pack(fill=X, padx=10, pady=3)
-Button(root, text="File/Video", command=send_file, bg="#386641", fg="white").pack(fill=X, padx=10, pady=3)
-
-hd = Button(root, text="HD OFF", command=toggle)
-hd.pack(fill=X, padx=10, pady=3)
-
-bar = Progressbar(root, orient=HORIZONTAL, mode="determinate")
-bar.pack(fill=X, padx=10, pady=10)
-
-entry.bind("<Return>", lambda e: send())
+Button(root, text="Send", command=send).pack(fill=X)
+Button(root, text="Image", command=send_img).pack(fill=X)
+Button(root, text="File", command=send_file).pack(fill=X)
 
 threading.Thread(target=receive, daemon=True).start()
 
