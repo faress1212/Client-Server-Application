@@ -142,7 +142,7 @@ def receive():
 
 # الاتصال بالسيرفر
 s = socket.socket()
-s.connect(('nozomi.proxy.rlwy.net', 36730))
+s.connect(('0.0.0.0', 8068))
 
 # UI
 root = Tk()
